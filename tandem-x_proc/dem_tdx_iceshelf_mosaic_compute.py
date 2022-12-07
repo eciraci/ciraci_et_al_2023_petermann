@@ -107,7 +107,7 @@ def main():
             """
     )
     # - Project data directory.
-    default_dir = os.path.join('/', 'Volumes', 'Extreme Pro', 'TanDEM-X')
+    default_dir = os.path.join(os.getenv('PYTHONDATA'), 'TanDEM-X')
     parser.add_argument('--directory', '-D',
                         type=lambda p: os.path.abspath(os.path.expanduser(p)),
                         default=default_dir,

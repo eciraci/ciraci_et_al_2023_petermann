@@ -2,19 +2,25 @@ name: lagr_env
 channels:
   - conda-forge
 dependencies:
+  - setuptools
+  - pip
   - numpy
   - scipy
-  - astropy
   - gdal
-  - matplotlib
-  - h5py
-  - tqdm
-  - xarray
   - rasterio
+  - matplotlib
+  - cartopy
+  - h5py
+  - netcdf4
+  - xarray
   - pandas
   - geopandas
   - fiona
   - pyproj
   - pyshp
   - shapely
-  - netcdf4
+  - jupyter
+  - pytmd
+  - tqdm
+  - flake8
+  - pylint
