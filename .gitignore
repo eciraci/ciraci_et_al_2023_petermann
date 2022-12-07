@@ -1,3 +1,21 @@
+# Output data to ignore
+#  netcdf files
+*.nc
+*.nc4
+*.H5
+
+# PyCharm Configurations files.
+.idea
+.idea/
+
+# Other Project related file extension
+*.aux.xml
+
+# MAC OS .DS_Store + icloud
+.DS_Store
+*.DS_Store
+*.icloud
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
