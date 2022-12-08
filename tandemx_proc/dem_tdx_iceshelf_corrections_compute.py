@@ -12,7 +12,7 @@ level is calculated as follows:
 H = He − Hg − αlpha (MDT + Htide + hIBE )
 Where:
 . He    -> DEM elevation above the WGS84 ellipsoid;
-. Hg    -> the EGM2008 geoid offset;
+. Hg    -> the EEIGEN-6C4 geoid offset;
 . MDT   -> Ocean Mean Dynamic Topography;
 . Htide -> Tide elevations above the average sea level;
 . hIBE  -> Inverse Barometer Effect on sea level height.
@@ -26,9 +26,8 @@ NOTE (1): at least for now, we subtract the EGM2008 geoid offset from each
     of the glacier's fjord and applied uniformly over the entire DEM's area.
     The effect of the alpha coefficient is, for this reason, neglected.
 
-The EGM2008 geoid offset is available here:
-https://www.usna.edu/Users/oceano/pguth/md_help/html/egm96.htm
-See ./geoid_height/crop_egm2008_geoid.py for more details.
+The EEIGEN-6C4 geoid offset is available with NSIDC BedMachine v5.
+https://nsidc.org/data/idbmg4/versions/5
 
 The Ocean Mean Dynamic Topography is distributed by AVISO and available here:
 https://www.aviso.altimetry.fr/en/data/products/auxiliary-products/mdt.html
