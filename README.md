@@ -1,17 +1,7 @@
 # ciraci_rignot_et_al_2022
 Compute Ice Shelf Basal Melt Rate in a Lagrangian Framework
 
-[![Language][]][1]
-
-### Installation:
-
-1. Setup minimal **conda** installation using [Miniconda][]
-
-2. Create Python Virtual Environment
-
-    > -   Creating an environment with commands ([Link][]);
-    > -   Creating an environment from an environment.yml file
-    >     ([Link][2])  -> **Recommended**;
+[![Language][]][1] [![License][]][2]
 
 
 ---
@@ -37,6 +27,15 @@ Compute Ice Shelf Basal Melt Rate in a Lagrangian Framework
 
 ```
 
+### Setup Python Environment
+
+1. Setup minimal **conda** installation using [Miniconda][]
+
+2. Create Python Virtual Environment
+
+    > -   Creating an environment with commands ([Link][]);
+    > -   Creating an environment from an environment.yml file
+    >     ([Link][2])  -> **Recommended**;
 
 #### PYTHON DEPENDENCIES:
 - [rasterio: access to geospatial raster data][]

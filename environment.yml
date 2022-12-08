@@ -24,3 +24,5 @@ dependencies:
   - tqdm
   - flake8
   - pylint
+  - pip:
+    - matplotlib_scalebar

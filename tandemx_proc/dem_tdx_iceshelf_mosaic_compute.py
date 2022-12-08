@@ -5,10 +5,12 @@ Written by Enrico Ciraci' (12/2021)
 
 Create a Daily Mosaics of TanDEM-X dems after the application of height
 corrections and the conversion from elevation above the standard ellipsoid
-WGS84 to elevation above the Geoid (EGM2008) - Mean Sea Level.
+WGS84 to elevation above the Geoid (EGM2008 or EIGEN-6C4) - Mean Sea Level.
 Before  creating the mosaic, the raster covering the largest area is chosen as
 reference. The other (secondary) rasters are afterward aligned to the reference
 one by employing on the estimation strategies reported below.
+
+See mosaicing_dem_rasterio.py - for more details.
 
 COMMAND LINE OPTIONS:
     --directory X, -D X: Project data directory.
@@ -24,10 +26,6 @@ COMMAND LINE OPTIONS:
                    the mean bias between the two raster.
             ->  2: use polynomial surface of order two to estimate/correct
                    the mean bias between the two raster.
-
-Note: This preliminary version of the script has been developed to process
-      TanDEM-X data available between 2011 and 2020 for the area surrounding
-      Petermann Glacier (Northwest Greenland).
 
 PYTHON DEPENDENCIES:
     numpy: package for scientific computing with Python
@@ -49,7 +47,6 @@ UPDATE HISTORY:
 # - Python Dependencies
 from __future__ import print_function
 import os
-import sys
 import argparse
 import numpy as np
 import pandas as pd
@@ -137,27 +134,27 @@ def main():
 
     # - Temporary Parameters
     poly_order = args.poly
-    # - TanDEM-X DEMs reprojection algorithm
+    # - TanDEM-X DEMs reprojection algorithm - use average by default
     resampling_alg = 'average'
 
     # - Input directory
-    input_data_path = os.path.join(args.directory, 'Petermann_Glacier_out',
+    input_data_path = os.path.join(args.directory, 'Processed_DEMs',
                                    'TanDEM-X_EPSG-{}_res-{}_ralg-{}'
                                    '_rio_amsl_corrected'
                                    .format(args.crs, args.res, resampling_alg))
     # - Create Output directory
     output_data_path \
-        = create_dir(os.path.join('/', 'Volumes', 'Extreme Pro', 'TanDEM-X',
-                                  'Petermann_Glacier_out'), 'Mosaics')
+        = create_dir(os.path.join(os.getenv('PYTHONDATA'), 'TanDEM-X',
+                                  'Processed_DEMs'), 'Mosaics')
     # -
     output_data_path = create_dir(output_data_path,
-                                  'Petermann_Glacier_Mosaics_EPSG-{}'
+                                  'ROI_Glacier_Mosaics_EPSG-{}'
                                   '_res-{}_ralg-{}_rio_amsl_corrected_poly{}'
                                   .format(args.crs, args.res,
                                           resampling_alg, args.poly))
     # - DEM Index File
-    indx_file = os.path.join(args.directory, 'Petermann_Glacier_out',
-                             'petermann_tandemx_dem_index.shp')
+    indx_file = os.path.join(args.directory, 'Processed_DEMs',
+                             'roi_tandemx_dem_index.shp')
 
     # - Read DEM index
     print('# - Load TanDEM-X DEMs Index.')
