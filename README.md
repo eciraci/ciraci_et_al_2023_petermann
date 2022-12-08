@@ -13,7 +13,30 @@ Compute Ice Shelf Basal Melt Rate in a Lagrangian Framework
     > -   Creating an environment from an environment.yml file
     >     ([Link][2])  -> **Recommended**;
 
-          
+
+---
+### Lagrangian Workflow
+```mermaid
+    graph LR;
+        A[(fa:fa-area-chart  TanDEM-X - Mosaics)] --> 
+        A1((+)) --> B
+        B[(fa:fa-area-chart  Calibrated DEMs)] --> B2
+        B2((+)) --> L
+        C[fa:fa-cloud I.B.E. ERA5] --> A1
+        D[fa:fa-globe EIGEN-6C4 Geoid] --> A1
+        E[fa:fa-earth MDT-CNES-CLS18] --> A1
+        F[Ocean Tide - AOTIM-5] --> A1
+        G[InSAR Ice Velocity] --> B2
+        L[Lagrangian dh/dt] --> N
+        M[SMB - RACMO2.3p2] --> N
+        N((fa:fa-spinner Melt Rate))
+
+        style A fill:#007b25,stroke:#333,stroke-width:4px
+        style B fill:#00758f,stroke:#333,stroke-width:4px
+        style N fill:#ec7c37,stroke:#333,stroke-width:4px
+
+```
+
 
 #### PYTHON DEPENDENCIES:
 - [rasterio: access to geospatial raster data][]
