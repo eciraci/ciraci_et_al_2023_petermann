@@ -371,8 +371,6 @@ def main():
                          )
 
     # - Load TanDEM-X index shapefile.
-    # -     To create the index file, see:
-    # -     https://github.com/eciraci/DHDT-TanDEM-X_DEM
     index_file = os.path.join(args.directory, 'TanDEM-X',
                               'Petermann_Glacier_out',
                               'petermann_tandemx_dem_index.shp')
@@ -381,6 +379,7 @@ def main():
     print('# - Load TanDEM-X DEMs Index.')
     dem_df = gpd.read_file(index_file).to_crs(epsg=args.crs)
     print('# - Total Number of DEMs available: {}'.format(len(dem_df.index)))
+
     # - The TanDEM-X index files reports the DEMs bounds polygons in
     dem_df['datetime'] = pd.DatetimeIndex(dem_df['time'])
 
