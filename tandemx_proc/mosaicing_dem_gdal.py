@@ -3,10 +3,17 @@ u"""
 mosaicing_dem_gdal.py
 Written by Enrico Ciraci' (08/2021)
 
-Create a Daily Mosaics of TanDEM-X dems over the regions of interest.
-Before  creating the mosaic, the raster covering the largest area is chosen as
-reference. The other (secondary) rasters are afterward aligned to the reference
-one by employing on the estimation strategies reported below.
+Mosaics Creation:
+    1. Read DEMs available for the selected day.
+    2. Use the raster covering the largest area as reference.
+    3. Align all the secondary DEMs to the reference DEM.
+        -> this last operation removes small biases present in consecutive DEMs.
+
+Use GDAL (Geospatial Data Abstraction Library) Python bindings package to apply
+the reprojection/interpolation.
+
+Find more details on the project website:
+    https://gdal.org/api/python.html
 
 COMMAND LINE OPTIONS:
     --directory X, -D X: Project data directory.
@@ -174,7 +181,7 @@ def main():
             """
     )
     # - Project data directory.
-    default_dir = os.path.join(os.getenv('PYTHONDATA'), 'TanDEM-X')
+    default_dir = os.path.join(os.getenv('PYTHONDATA'), 'RAW_DEMs')
     parser.add_argument('--directory', '-D',
                         type=lambda p: os.path.abspath(os.path.expanduser(p)),
                         default=default_dir,
@@ -212,26 +219,26 @@ def main():
     poly_order = args.poly
 
     # - Input directory
-    input_data_path = os.path.join(args.directory, 'Petermann_Glacier_out',
+    input_data_path = os.path.join(args.directory, 'Processed_DEMs',
                                    'TanDEM-X_EPSG-{}_res-{}_ralg-{}_gdal'
                                    .format(args.crs, args.res,
                                            args.resampling_alg))
 
     # - Create Output directory
     output_data_path \
-        = create_dir(os.path.join('/', 'Volumes', 'Extreme Pro', 'TanDEM-X',
-                                  'Petermann_Glacier_out'), 'Mosaics')
+        = create_dir(os.path.join(os.getenv('PYTHONDATA'), 'TanDEM-X',
+                                  'Processed_DEMs'), 'Mosaics')
     # -
     output_data_path \
         = create_dir(output_data_path,
-                     'Petermann_Glacier_Mosaics_gdal_EPSG-{}'
+                     'ROI_Mosaics_gdal_EPSG-{}'
                      '_res-{}_ralg-{}_gdal_poly{}'
                      .format(args.crs, args.res,
                              args.resampling_alg, args.poly
                              ))
     # - DEM Index File
-    indx_file = os.path.join(args.directory, 'Petermann_Glacier_out',
-                             'petermann_tandemx_dem_index.shp')
+    indx_file = os.path.join(args.directory, 'Processed_DEMs',
+                             'roi_tandemx_dem_index.shp')
 
     # - Read DEM index
     print('# - Load TanDEM-X DEMs Index.')
@@ -437,7 +444,7 @@ def main():
                         elif poly_order in [0]:
                             # - Calculate the mean bias as the mean of the
                             # - difference between the two rasters considered
-                            # - over the the overlapping areas.
+                            # - over the overlapping areas.
                             with warnings.catch_warnings():
                                 # - Ignore RuntimeWarning: Mean of empty slice
                                 warnings.simplefilter('ignore',

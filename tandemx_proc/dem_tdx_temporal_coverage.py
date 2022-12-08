@@ -3,8 +3,8 @@ u"""
 dhdt_trend_map.py
 Written by Enrico Ciraci' (01/2022)
 
-TEST: Evaluate TanDEM-X data coverage over the selected region of interest and
-during the selected reference temporal interval.
+Evaluate data coverage over the selected region of interest and during the
+selected reference temporal interval provided by tge TanDEM-X dataset.
 
 The Region of Interest boundaries can be provided either in the form of:
 - Esri polygon shapefile.

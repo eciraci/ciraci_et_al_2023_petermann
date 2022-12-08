@@ -3,23 +3,24 @@ u"""
 index_tandemx_dem.py
 Written by Enrico Ciraci' (08/2021)
 
-Create a Shapefile Index of the time-tagged Digital Elevation Models derived
-from TanDEM-X mission (TerraSAR-X add-on for Digital Elevation Measurement) and
-provided by the German Aerospace Centre (DLR).
-For each DEM, a polygon representing the bounding of  the region contiguous
-with valid  elevation data is calculated added to the global index file saved
-in ESRI shapefile format.
-Each of the polygons added to the index file is associated with some
-attributes which values are extracted from metadata of the relative DEM:
+Create an Index Shapefile of time-tagged Raw Digital Elevation Models
+from the German Aerospace Centre (DLR) TanDEM-X mission (TerraSAR-X add-on for
+Digital Elevation Measurement).
+
+The index file will contain an entry for each time-tagged DEM file in the
+dateset. Each index entry will be composed by a polygon showing the area of
+valid elevation data covered by the DEM, and an attribute tables containing
+the following attiributes:
+
 - DEM Name,
 - Raster Width in pixels,
 - Raster Height in pixel;
 - DEM Time Tag: Year,Month,Day - isoformat;
 - Elevation Units.
 
-Note: This script has been developed to process TanDEM-X data available between
-      2011 and 2020 for the area surrounding  Petermann Glacier
-      (Northwest Greenland).
+Note: This script was developed to process TanDEM-X elevation data  available
+    between  2011 and 2021 for the area surrounding  Petermann Glacier
+    (Northwest Greenland).
 
 PYTHON DEPENDENCIES:
     numpy: package for scientific computing with Python
@@ -55,24 +56,25 @@ from utility_functions import create_dir
 
 def main() -> None:
     """Create TanDEM-X DEM index shapefile """
-    # - Processing Parameters
-    crs = "EPSG:4326"       # - default coordinate reference system
-    # - Input data directory
+    # - Input data directory - Directory containing the TanDEM-X DEM files
     input_data_path \
-        = os.path.join(os.getenv('PYTHONDATA'), 'tandemx', 'Petermann_Glacier')
+        = os.path.join(os.getenv('PYTHONDATA'), 'TanDEM-X', 'RAW_DEMs')
     # - Create Output directory
     output_data_path \
-        = create_dir(os.path.join(os.getenv('PYTHONDATA'), 'tandemx'),
-                     'Petermann_Glacier_out')
+        = create_dir(os.path.join(os.getenv('PYTHONDATA'), 'TanDEM-X'),
+                     'Processed_DEMs')
     # - List input data directory content
     input_data_dir = [os.path.join(input_data_path, x)
                       for x in os.listdir(input_data_path) if not
                       x.startswith('.') and x.endswith('.tiff')]
+
     print('# - Create Shapefile Index of the time-tagged Digital Elevation '
           'Models from the DLR/TanDEM-X mission.')
     # -
     print(f'# - Number of DEMs Found: {len(input_data_dir)}')
 
+    # - Processing Parameters
+    crs = "EPSG:4326"       # - default coordinate reference system
     # - Define output index shapefile schema
     schema = {
         'geometry': 'Polygon',
@@ -80,8 +82,7 @@ def main() -> None:
                        ('Width', 'int'), ('Height', 'int'),
                        ('Units', 'str'), ('npts', 'str')]
     }
-    out_f_name = os.path.join(output_data_path,
-                              'petermann_tandemx_dem_index.shp')
+    out_f_name = os.path.join(output_data_path, 'roi_tandemx_dem_index.shp')
     with fiona.open(out_f_name, mode='w', driver='ESRI Shapefile',
                     schema=schema, crs=crs) as poly_shp:
         for dem in tqdm(sorted(input_data_dir), ncols=70,

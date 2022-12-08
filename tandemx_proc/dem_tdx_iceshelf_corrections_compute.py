@@ -12,7 +12,7 @@ level is calculated as follows:
 H = He − Hg − αlpha (MDT + Htide + hIBE )
 Where:
 . He    -> DEM elevation above the WGS84 ellipsoid;
-. Hg    -> the EEIGEN-6C4 geoid offset;
+. Hg    -> the (EGM2008 or EIGEN-6C4) geoid offset;
 . MDT   -> Ocean Mean Dynamic Topography;
 . Htide -> Tide elevations above the average sea level;
 . hIBE  -> Inverse Barometer Effect on sea level height.
@@ -21,13 +21,15 @@ Where:
            Note that this last component is actually not considered in this
            implementation of the algorithm.
 
-NOTE (1): at least for now, we subtract the EGM2008 geoid offset from each
-    pixel of the input DEM. The other corrections are computed at the entry
-    of the glacier's fjord and applied uniformly over the entire DEM's area.
+NOTE: The corrections are computed at the entry of the glacier's fjord
+    and applied uniformly over the entire DEM's area.
     The effect of the alpha coefficient is, for this reason, neglected.
 
-The EEIGEN-6C4 geoid offset is available with NSIDC BedMachine v5.
+The EIGEN-6C4 geoid offset is available with NSIDC BedMachine v5:
 https://nsidc.org/data/idbmg4/versions/5
+
+The EGM2008 geoid offset is available at:
+https://www.usna.edu/Users/oceano/pguth/md_help/html/egm96.htm
 
 The Ocean Mean Dynamic Topography is distributed by AVISO and available here:
 https://www.aviso.altimetry.fr/en/data/products/auxiliary-products/mdt.html
@@ -356,23 +358,20 @@ def main():
     hc = amp * np.exp(cph)
 
     # - TanDEM-X DEMS input path
-    dem_input_path = os.path.join(args.directory, 'TanDEM-X',
-                                  'Petermann_Glacier_out',
+    dem_input_path = os.path.join(args.directory, 'TanDEM-X', 'Processed_DEMs',
                                   'TanDEM-X_EPSG-{}_res-{}_ralg-{}_{}'
                                   .format(args.crs, args.res,
                                           resampling_alg, gdal_binding))
     # - Create Output Directory
-    out_dir = create_dir(os.path.join(args.directory, 'TanDEM-X',
-                                      'Petermann_Glacier_out'),
-                         'TanDEM-X_EPSG-{}_res-{}_ralg-{}_{}_amsl_corrected'
-                         .format(args.crs, args.res,
-                                 resampling_alg, gdal_binding)
-                         )
+    out_dir\
+        = create_dir(os.path.join(args.directory, 'TanDEM-X', 'Processed_DEMs'),
+                     'TanDEM-X_EPSG-{}_res-{}_ralg-{}_{}_amsl_corrected'
+                     .format(args.crs, args.res, resampling_alg, gdal_binding))
 
     # - Load TanDEM-X index shapefile.
     index_file = os.path.join(args.directory, 'TanDEM-X',
-                              'Petermann_Glacier_out',
-                              'petermann_tandemx_dem_index.shp')
+                              'Processed_DEMs',
+                              'roi_tandemx_dem_index.shp')
 
     # - Read DEM index
     print('# - Load TanDEM-X DEMs Index.')
@@ -381,9 +380,6 @@ def main():
 
     # - The TanDEM-X index files reports the DEMs bounds polygons in
     dem_df['datetime'] = pd.DatetimeIndex(dem_df['time'])
-
-    # - IBE Corr List - save the IBE correction for each DEM
-    ibe_corr_list = []
 
     # - Initialize a Corrections Report File
     with open(os.path.join(out_dir, '00_corrections_report.csv'), 'w') as w_fid:
@@ -419,7 +415,7 @@ def main():
                          & (y_coords_geoid <= y_coords_dem[-1]))
         ind_xx, ind_yy = np.meshgrid(ind_x, ind_y)
 
-        # - Express DEM elevation values as height above the EGM2008 Geoid.
+        # - Express DEM elevation values as height above the geoid.
         dem_elev -= geoid_ref[ind_yy, ind_xx]
 
         # - Calculate Inverse Barometer Effect Correction at the considered
