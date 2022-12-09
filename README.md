@@ -1,5 +1,5 @@
 # ciraci_rignot_et_al_2022
-This package is a Python implementation of the melt rate using time-tagged Digital Elevation Models from the DLR TanDEM-X mission.
+The repository contains a set of scripts that can be used to estimate ice shelf basal melt using time-tagged Digital Elevation Models from the DLR TanDEM-X mission.
 For more details see: Ciraci, Rignot, et. al (2022) - Need To Update the Reference
 
 [![Language][]][1] [![License][]][2]
@@ -26,7 +26,7 @@ when ice can be assumed on  flotation, the average melt rate $\dot{b}$ can be co
 equation:
 
 ```math
-\dot{b} = - \left (\frac{\partial h}{\partial t} + (h -d)(\nabla \cdot \bar{v})\right )  \left ( \frac{\rho_{water}}{\rho _{water} - \rho _{ice}}\right ) - \dot{a}\ (2)
+\dot{b} = - \left (\frac{\partial h}{\partial t} + (h - d)(\nabla \cdot \bar{v})\right )  \left ( \frac{\rho_{water}}{\rho _{water} - \rho _{ice}}\right ) - \dot{a}\ (2)
 ```
 Where $h$ is the ice surface elevation with respect to mean sea level, $\frac{\partial h}{\partial t}$ is its temporal 
 derivative, $d$ the firn air content, $\rho _{water}$ density of seawater, $\rho _{ice}$ density of ice, 
@@ -37,32 +37,29 @@ Equation (2) can be solved by following the steps presented below:
 1. Compute $h$, by subtracting from TanDEM-X elevation data:
    - the geoid offset (geoid height above the reference ellipsoid WGS84) from the EIGEN-6C4 model (Foerste et al. 2014) and the
    - Mean Dynamic Ocean topography (mean sea surface height above geoid) by employing estimates from the MDT-CNES-CLS18 dataset (Mulet et al. 2021). 
+   - Vertical displacements due to ocean tides and atmospheric pressure. 
+   
+     - Ocean tides at the outlet of the fjord of the glacier are estimated using outputs from the
+     Arctic Ocean Tidal Inverse Model, 5km  (AOTIM5) (Padman et al. 2011) computed via the PyTDM python 
+     module (Sutterley et al. 2019). 
 
-2. Correct elevation data for vertical displacements due to ocean tides and atmospheric pressure. 
-   Ocean tides at the outlet of the fjord of the glacier are estimated using outputs from the
-   Arctic Ocean Tidal Inverse Model, 5km  (AOTIM5) (Padman et al. 2011) computed via the PyTDM python 
-   module (Sutterley et al. 2019). 
-
-3. Remove Dynamic Atmospheric effect (inverse barometer effect) due to changes in pressure is computed 
+   - Dynamic Atmospheric effect (inverse barometer effect) due to changes in pressure is computed 
    by employing hourly Mean Sea Level pressure from the fifth-generation global reanalysis from 
    the European Centre for Medium-Range Weather Forecasts ERA5 (Hersbach et al. 2020). 
    
-4. Surface Mass Balance ($\dot{a}$) by employing outputs from the Regional Atmospheric Climate Model Version p2.3 (RACMOv2.3p).
+2. Compute Surface Mass Balance over the ice shelf ($\dot{a}$) by employing outputs from the Regional Atmospheric Climate Model Version p2.3 (RACMOv2.3p).
       
-5. Annual ice velocity mosaic from to assess the ice flow divergence.
+3. Use ice velocity mosaic from Rignot et al. 2009 to assess the ice flow divergence.
 
 
-To compute the Lagrangian elevation chnage ($\frac{\partial h}{\partial t}$) from a pair of DEMs, 
-we track each ice particle (pixel) in the earlier DEM to its corresponding downstream location 
-where it intersects a later DEM. 
-we update the particle location with a time step equal to one month using the annual velocity mosaics. 
+To compute the Lagrangian elevation chnage ($\frac{\partial h}{\partial t}$) from a pair 
+of DEMs,  the path of each ice particle (pixel) in the earlier DEM need to be tracked 
+to its corresponding downstream location  where it intersects a later DEM. 
+Ice velocity mosaics can be used to update the particle location with a time step equal to one month. 
 we use the observed cumulative $\frac{\partial h}{\partial t}$ to assess the evolving particle elevation $h$ '
 along its path. 
-Ice flow divergence is also sampled at each step and used to compute h∇∙v correctly integrated along the particle's 
-full path (see equation 12 in Shean et al. 2019). We extract the surface mass balance contribution to equation (2) 
-at the particle path midpoint, and we finally assign the estimated basal melt rate to the same 
-location **[Midpoint Approach]**.
-
+Ice flow divergence has to be sampled at each step and used to compute $(h - d)(\nabla \cdot \bar{v})$
+correctly integrated along the particle's  full path (see equation 12 in Shean et al. 2019).
 
 
 ### Lagrangian Workflow
