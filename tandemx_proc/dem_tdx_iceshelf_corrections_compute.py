@@ -9,23 +9,18 @@ Lagrangian Approach which assumes an ice shelf in hydrostatic equilibrium.
 Following Shean et al. 2019, the corrected ice surface elevation above sea
 level is calculated as follows:
 
-H = He − Hg − αlpha (MDT + Htide + hIBE )
+H = He − Hg − (MDT + Htide + hIBE )
 Where:
 . He    -> DEM elevation above the WGS84 ellipsoid;
 . Hg    -> the (EGM2008 or EIGEN-6C4) geoid offset;
 . MDT   -> Ocean Mean Dynamic Topography;
 . Htide -> Tide elevations above the average sea level;
 . hIBE  -> Inverse Barometer Effect on sea level height.
-. alpha -> coefficient αlpha that increase linearly with distance l downstream
-           of the grounding line (see Shean et al. 2019).
-           Note that this last component is actually not considered in this
-           implementation of the algorithm.
 
 NOTE: The corrections are computed at the entry of the glacier's fjord
     and applied uniformly over the entire DEM's area.
-    The effect of the alpha coefficient is, for this reason, neglected.
 
-The EIGEN-6C4 geoid offset is available with NSIDC BedMachine v5:
+The EIGEN-6C4 geoid offset is available with NSIDC BedMachine version 5:
 https://nsidc.org/data/idbmg4/versions/5
 
 The EGM2008 geoid offset is available at:
@@ -80,9 +75,9 @@ optional arguments:
   --median              User long-term Median MSL as reference in the Pressure
                         anomaly calculation.
 
-Note: This preliminary version of the script has been developed to process
-      TanDEM-X data available between 2011 and 2020 for the area surrounding
-      Petermann Glacier (Northwest Greenland).
+Note: This script has been developed to process TanDEM-X data available between
+    2011 and 2020 for the area surrounding Petermann Glacier
+    (Northwest Greenland).
 
 PYTHON DEPENDENCIES:
     numpy: package for scientific computing with Python
@@ -99,10 +94,6 @@ PYTHON DEPENDENCIES:
            https://xarray.pydata.org/en/stable
 
 UPDATE HISTORY:
-01/04/2022: --geoid, -G: option added.
-09/29/2022: If the IBE correction is not available, use the median value
-    of the hourly climatology extract for the entire period of data
-    availability.
 """
 # - python dependencies
 from __future__ import print_function
@@ -126,6 +117,7 @@ from pyTMD.time import convert_calendar_dates
 # - Program Dependencies
 from Era5Loader import Era5Loader
 from utility_functions import create_dir, do_kdtree
+from utility_functions_rio import load_dem_tiff
 
 
 def load_geoid(in_path: str, geoid: str = 'EGM2008', n_res: str = '1',
@@ -139,16 +131,15 @@ def load_geoid(in_path: str, geoid: str = 'EGM2008', n_res: str = '1',
     :param res: interpolated Geoid resolution.
     :return:
     """
+    # - Path to geoid data models cropped over the region of interest.
     if geoid == 'EGM2008':
-        g_f_name = 'Petermann_Domain_Velocity_Stereo_egm2008-{}f_EPSG' \
-                   '-{}_res{}_bilinear.tiff'.format(n_res, epsg, res)
+        g_f_name = 'ROI_egm2008-{}f_EPSG' \
+                   '-{}_res{}.tiff'.format(n_res, epsg, res)
     elif geoid == 'BedMachine':
-        g_f_name = 'Petermann_Domain_Velocity_Stereo_EIGEN-EC4_height_' \
-                   'EPSG-{}_res{}_bilinear.tiff'.format(epsg, res)
+        g_f_name = 'ROI_EIGEN-EC4_height_' \
+                   'EPSG-{}_res{}.tiff'.format(epsg, res)
     else:
-        print('# - Unknown Reference Geoid Model Selected.')
-        import sys
-        sys.exit()
+        raise ValueError('# - Unknown Reference Geoid Model Selected.')
 
     # - extract geoid data
     with rasterio.open(os.path.join(in_path, g_f_name), mode="r+") as src:
@@ -170,29 +161,6 @@ def load_geoid(in_path: str, geoid: str = 'EGM2008', n_res: str = '1',
                'y_coords': y_coords, 'res': grid_res,
                'transform': transform, 'src_transform': src.transform,
                'nodata': src.nodata}
-
-
-def load_dem_tiff(in_path: str) -> dict:
-    # - Load TanDEM-X DEM raster saved in GeoTiff format.
-    with rasterio.open(in_path, mode="r+") as src:
-        # - read band #1 - DEM elevation in meters
-        dem_input = src.read(1)
-        # - raster upper-left and lower-right corners
-        ul_corner = src.transform * (0, 0)
-        lr_corner = src.transform * (src.width, src.height)
-        grid_res = src.res
-        # -
-        x_coords = np.arange(ul_corner[0], lr_corner[0], grid_res[0])
-        y_coords = np.arange(lr_corner[1], ul_corner[1], grid_res[1])
-        if src.transform.e < 0:
-            dem_input = np.flipud(dem_input)
-        # - Compute New Affine Transform
-        transform = (Affine.translation(x_coords[0], y_coords[0])
-                     * Affine.scale(src.res[0], src.res[1]))
-        return{'dem': dem_input, 'x_coords': x_coords,
-               'y_coords': y_coords, 'res': grid_res,
-               'transform': transform,
-               'src_transform': src.transform, 'nodata': src.nodata}
 
 
 class MdtCnes:
@@ -232,10 +200,10 @@ class MdtCnes:
         # - Use kd-tree to find the index of the closest location
         index = do_kdtree(combined_x_y_arrays, s_points)
         if verbose:
-            print('# - Closest point to the selected coordinates '
-                  'within the input data domain -> Lat: {}, Lon: {}'
-                  .format(y_coords_mm.ravel()[index],
-                          x_coords_mm.ravel()[index]))
+            print(f'# - Closest point to the selected coordinates '
+                  f'within the input data domain -> '
+                  f'Lat: {y_coords_mm.ravel()[index]}, '
+                  f'Lon: {x_coords_mm.ravel()[index]}')
 
         return {'msl_sample': self.mdt_input.ravel()[index],
                 'index': index}
@@ -462,8 +430,9 @@ def main():
 
         # - Save Corrected DEM
         out_file = os.path.join(out_dir, 'DEM_TAXI_TDM1_SAR__COS_BIST_SM_S_SRA_'
-                                + row['Name']+'-{}_EPSG-{}_res-{}.tiff'
-                                .format(gdal_binding, args.crs, args.res))
+                                + row['Name']
+                                + f'-{gdal_binding}_EPSG-{args.crs}'
+                                  f'_res-{args.res}.tiff')
         if dem_in['src_transform'].e < 0:
             # - Save the final corrected DEM employing the same Affine
             # - Transformation of the Input one.

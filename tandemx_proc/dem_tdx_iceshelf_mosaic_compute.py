@@ -66,7 +66,7 @@ def polynomial_mean_bias_estimator(x_v_reg, y_v_reg, elev_d_v_reg,
                                    poly_order=1):
     """
     Apply Linear Regression to calculate mean bias among
-    partially overlapping DEMs.
+    partially overlapping DEMs
     :param x_v_reg: flattened easting domain coordinates
     :param y_v_reg: flattened northing domain coordinates
     :param elev_d_v_reg: flattened elevation values
@@ -97,7 +97,7 @@ def polynomial_mean_bias_estimator(x_v_reg, y_v_reg, elev_d_v_reg,
     return reg
 
 
-def main():
+def main() -> None:
     # - Read the system arguments listed after the program
     parser = argparse.ArgumentParser(
         description="""Create Mosaic of Corrected TanDEM-X DEMs using Rasterio.
@@ -180,9 +180,8 @@ def main():
     # -
     for s_date in tqdm(date_range, ncols=70,
                        desc="# - Create Daily TanDEM-X Mosaics: "):
-        day_df = dem_df.query('year == {} & month == {} & day == {}'
-                              .format(s_date.year, s_date.month,
-                                      s_date.day))
+        day_df = dem_df.query(f'year == {s_date.year} & month == {s_date.month} '
+                              f'& day == {s_date.day}')
         # - if DEMs are found for the considered date,
         # - calculate their mosaic.
         if not day_df.empty:
@@ -249,8 +248,7 @@ def main():
             # - Note that these axes define a raster coordinate system
             # - where the origin is the lower left corner of the lower left
             # - pixel. The output  raster will have to be referenced
-            # - is a coordinates' system where the origin is the upper left
-            # - pixel of the raster.
+            # - system where the origin is the upper left  pixel of the raster.
             mosaic_vect_x = np.arange(minx, maxx+1, args.res)
             mosaic_vect_y = np.arange(miny, maxy+1, args.res)
 
@@ -394,4 +392,4 @@ if __name__ == '__main__':
     start_time = datetime.now()
     main()
     end_time = datetime.now()
-    print("# - Computation Time: {}".format(end_time - start_time))
+    print(f"# - Computation Time: {end_time - start_time}")
