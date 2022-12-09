@@ -8,13 +8,6 @@ TanDEM-X DEM MOSAICS. Time series are calculated at the selected coordinates
 that can be provided in the form of a Point/Multipoint esri shapefile or as a
 single coordinates pair provided as comma-separated values.
 
-See extract_point_time_series.py for more info.
-
-NOTE: In this version of the script, no DEMs index file is ude to verify if the
-    selected sampling point are actually  located inside the area covered by
-    the DEMs time series.
-
-
 COMMAND LINE OPTIONS:
   -h, --help            show this help message and exit
   --directory DIRECTORY, -D DIRECTORY
@@ -30,10 +23,6 @@ COMMAND LINE OPTIONS:
                         Moving Median Filter Window Size.
   --out_thresh OUT_THRESH, -T OUT_THRESH
                         Outliers Detection Threshold.
-
-Note: This preliminary version of the script has been developed to process
-      TanDEM-X data available between 2011 and 2020 for the area surrounding
-      Petermann Glacier (Northwest Greenland).
 
 PYTHON DEPENDENCIES:
     numpy: package for scientific computing with Python
@@ -74,30 +63,18 @@ from pyproj import CRS
 from pyproj import Transformer
 import matplotlib.pyplot as plt
 from utility_functions_tdx import dem_2_skip
+from utility_functions import create_dir
 plt.rc('font', family='monospace')
 plt.rc('font', weight='bold')
 plt.style.use('seaborn-v0_8-deep')
 
 
-def create_dir(abs_path: str, dir_name: str) -> str:
-    """
-    Create directory
-    :param abs_path: absolute path to the output directory
-    :param dir_name: new directory name
-    :return: absolute path to the new directory
-    """
-    import os
-    dir_to_create = os.path.join(abs_path, dir_name)
-    if not os.path.exists(dir_to_create):
-        os.mkdir(dir_to_create)
-    return dir_to_create
-
-
 def main() -> None:
-    # - Extract Elevation time series evaluated at the selected Geographic
-    # - Locations.
+    """
+    Extract Elevation time series evaluated at the selected geographic location.
+    """
     parser = argparse.ArgumentParser(
-        description="""Extract Elevation time series for the provided 
+        description="""Extract Elevation time series for the provided
         Geographic Coordinates [Use Daily Mosaics]"""
     )
     # - Project data directory.
@@ -152,14 +129,13 @@ def main() -> None:
 
     # - Path to DEM directory
     dem_dir = os.path.join(args.directory, 'TanDEM-X',
-                           'Petermann_Glacier_out', 'Mosaics',
-                           f'Petermann_Glacier_Mosaics_EPSG-{args.crs}'
+                           'Processed_DEMs', 'Mosaics',
+                           f'ROI_Glacier_Mosaics_EPSG-{args.crs}'
                            f'_res-{args.res}_ralg-{resampling_alg}'
                            f'_{gdal_binding}_poly0')
 
     # - Load TanDEM-X index shapefile
-    index_file = os.path.join(dem_dir,
-                              'petermann_tandemx_dem_mosaics_index.shp')
+    index_file = os.path.join(dem_dir, 'roi_tandemx_dem_index.shp')
 
     # - Figure Parameters - Not Editable
     fig_format = 'jpeg'
@@ -182,7 +158,7 @@ def main() -> None:
     # - Add time-tag column
     time_tag_list = []
     dem_df['time-tag'] = np.nan
-    print('# - Number of DEMs available: {}'.format(len(dem_df.index)))
+    print(f'# - Number of DEMs available: {len(dem_df.index)}')
 
     print('# - Remove unusable DEMs.')
     for index, row in dem_df.iterrows():
@@ -195,7 +171,7 @@ def main() -> None:
     for t_tag in dem_2_skip():
         index_d = dem_df[dem_df['time-tag'] == t_tag].index
         dem_df.drop(index_d, inplace=True)
-    print('# - Number of DEMs available: {}'.format(len(dem_df.index)))
+    print(f'# - Number of DEMs available: {len(dem_df.index)}')
 
     # - Drop not necessary columns and set new index column
     dem_df = dem_df.drop(['time-tag'], axis=1)  # - drop original time axis
@@ -227,8 +203,8 @@ def main() -> None:
 
         print('# - Calculating Elevation Time Series at the following '
               'coordinates:')
-        print('# - Latitude:  {}'.format(coords_list[1]))
-        print('# - Longitude: {}'.format(coords_list[0]))
+        print(f'# - Latitude:  {coords_list[1]}')
+        print(f'# - Longitude: {coords_list[0]}')
 
         # - Find DEMs with valid elevation data running a spatial join between
         # - the GeoDataFrame created using the point of interest coordinates
@@ -268,7 +244,7 @@ def main() -> None:
                                              actual_range=[np.min(elev_ts),
                                                            np.max(elev_ts)])
                                   )
-        print("# - Number of Observations: {}".format(len(elev_ts)))
+        print(f"# - Number of Observations: {len(elev_ts)}")
         if len(elev_ts) >= 2 * args.win_size:
             if np.where(np.isfinite(elev_ts))[0].size == 0:
                 print('# - Not Valid Observations Found.')
@@ -293,8 +269,8 @@ def main() -> None:
                 sys.exit()
             elev_ts_da.attrs['actual_range'] \
                 = [np.nanmin(elev_ts_no_out), np.nanmax(elev_ts_no_out)]
-            print("# - Number of Outliers Found: {}"
-                  .format(len(elev_ts) - len(elev_ts_no_out)))
+            print(f"# - Number of Outliers Found: "
+                  f"{len(elev_ts) - len(elev_ts_no_out)}")
         print(' ')
         elev_ts_da.to_netcdf(os.path.join(out_dir,
                                           'point_elev_ts_meter_coords({},{}).nc'
@@ -304,23 +280,21 @@ def main() -> None:
 
         # - Calculate Linear Trend in Elevation
         poly_c = elev_ts_da.polyfit("time", 1,
-                                    skipna=True)[
-            'polyfit_coefficients'].values
+                                    skipna=True)['polyfit_coefficients'].values
         trend = np.round(poly_c[0] * nano_sec_2_year, decimals=3)
 
         # - plot elevation time series
         fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(1, 1, 1)
-        ax.set_title("Lat: {} - Lon: {}"
-                     .format(np.around(float(coords_list[1]), decimals=3),
-                             np.around(float(coords_list[0]), decimals=3)),
+        ax.set_title(f"Lat: {np.around(float(coords_list[1]), decimals=3)} "
+                     f"- Lon: {np.around(float(coords_list[0]), decimals=3)}",
                      weight='bold', loc='left', size=label_size_rc)
         elev_ts_da.plot.line(color=p_color, marker=p_marker, lw=lw,
                              markersize=m_size, ax=ax)
         ax.grid(color='k', linestyle='dotted', alpha=0.3)
 
         # - Annotate linear trend
-        txt = r'Linear Trend {} m/year'.format(trend)
+        txt = f'Linear Trend {trend} m/year'
         ax.annotate(txt, xy=(0.03, 0.03), xycoords="axes fraction",
                     size=label_size_rc, zorder=100,
                     bbox=dict(boxstyle="square", fc="w"))
@@ -377,8 +351,8 @@ def main() -> None:
 
             print('# - Calculating Elevation Time Series at the following '
                   'coordinates:')
-            print('# - Latitude:  {}'.format(c_points[0]))
-            print('# - Longitude: {}'.format(c_points[1]))
+            print(f'# - Latitude:  {c_points[0]}')
+            print(f'# - Longitude: {c_points[1]}')
 
             # - Find DEMs with valid elevation data running a spatial join
             # - between  the GeoDataFrame created using the point of interest
@@ -427,7 +401,7 @@ def main() -> None:
                                                      np.max(elev_ts)])
                                       )
 
-            print("# - Number of Observations: {}".format(len(elev_ts)))
+            print(f"# - Number of Observations: {len(elev_ts)}")
             if len(elev_ts) >= 2 * args.win_size:
                 if np.where(np.isfinite(elev_ts))[0].size == 0:
                     print('# - Not Valid Observations Found.')
@@ -452,21 +426,21 @@ def main() -> None:
                     continue
                 elev_ts_da.attrs['actual_range'] \
                     = [np.nanmin(elev_ts_no_out), np.nanmax(elev_ts_no_out)]
-                print("# - Number of Outliers Found: {}"
-                      .format(len(elev_ts) - len(elev_ts_no_out)))
+                print(f"# - Number of Outliers Found: "
+                      f"{len(elev_ts) - len(elev_ts_no_out)}")
 
             print('\n')
             elev_ts_da \
                 .to_netcdf(os.path.join(out_dir,
                                         'point_elev_ts_meter'
-                                        '_coords({},{}).nc'
-                                        .format(c_points[0], c_points[1])),
+                                        f'_coords({c_points[0]},'
+                                        f'{c_points[0]}).nc'),
                            mode='w', format='NETCDF4')
 
             # - Calculate Linear Trend in Elevation
-            poly_c = elev_ts_da.polyfit("time", 1,
-                                        skipna=True)[
-                'polyfit_coefficients'].values
+            poly_c \
+                = elev_ts_da.polyfit("time", 1,
+                                     skipna=True)['polyfit_coefficients'].values
             trend = np.round(poly_c[0] * nano_sec_2_year, decimals=3)
             # - plot elevation time series
             fig = plt.figure(figsize=(10, 6))
@@ -480,7 +454,7 @@ def main() -> None:
             ax.grid(color='k', linestyle='dotted', alpha=0.3)
 
             # - Annotate linear trend
-            txt = r'Linear Trend {} m/year'.format(trend)
+            txt = f'Linear Trend {trend} m/year'
             ax.annotate(txt, xy=(0.03, 0.03), xycoords="axes fraction",
                         size=label_size_rc, zorder=100,
                         bbox=dict(boxstyle="square", fc="w"))
