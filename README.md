@@ -119,10 +119,13 @@ correctly integrated along the particle's  full path (see equation 12 in Shean e
 - [gdal: Python's GDAL binding.][]
 - [fiona: Fiona is GDAL’s neat and nimble vector API for Python programmers.][]
 - [numpy: The fundamental package for scientific computing with Python.][]
+- [pandas: Python Data Analysis Library.][]
+- [geopandas: add support for geographic data to pandas objects.][]
 - [xarray: Labelled multi-dimensional arrays in Python.][]
 - [matplotlib: Library for creating static, animated, and interactive visualizations in Python.][]
 - [tqdm: A Fast, Extensible Progress Bar for Python and CLI.][]
 - [necdft4: Provides an object-oriented python interface to the netCDF version 4 library.][]
+- [pandas: Python Data Analysis Library.][]
 - [PyTMD: Python package for the analysis of tidal data.][]
 
 [Language]: https://img.shields.io/badge/python%20-3.7%2B-brightgreen
@@ -135,9 +138,11 @@ correctly integrated along the particle's  full path (see equation 12 in Shean e
 [xarray: Labelled multi-dimensional arrays in Python.]:https://docs.xarray.dev
 [rasterio: access to geospatial raster data]:https://rasterio.readthedocs.io/en/latest/
 [gdal: Python's GDAL binding.]: https://gdal.org/index.html
-[matplotlib: Library for creating static, animated, and interactive visualizations in Python.]:https://matplotlib.org
 [tqdm: A Fast, Extensible Progress Bar for Python and CLI.]: https://github.com/tqdm/tqdm
 [necdft4: Provides an object-oriented python interface to the netCDF version 4 library.]:https://pypi.org/project/netCDF4/
 [fiona: Fiona is GDAL’s neat and nimble vector API for Python programmers.]:https://fiona.readthedocs.io/en/latest/
 [numpy: The fundamental package for scientific computing with Python.]:https://numpy.org
 [PyTMD: Python package for the analysis of tidal data.]: https://github.com/tsutterley/pyTMD
+[pandas: Python Data Analysis Library.]:https://pandas.pydata.org/
+[geopandas: add support for geographic data to pandas objects.]:https://geopandas.org/en/stable/
+[matplotlib: Library for creating static, animated, and interactive visualizations in Python.]:https://matplotlib.org
