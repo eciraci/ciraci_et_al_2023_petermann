@@ -3,25 +3,40 @@ u"""
 mosaicing_dem_rasterio.py
 Written by Enrico Ciraci' (08/2021)
 
-Create a Daily Mosaics of TanDEM-X dems over the regions of interest.
-Before  creating the mosaic, the raster covering the largest area is chosen as
-reference. The other (secondary) rasters are afterward aligned to the reference
-one by employing on the estimation strategies reported below.
+Create a Daily Mosaics of TanDEM-X DEMs.
 
-COMMAND LINE OPTIONS:
-    --directory X, -D X: Project data directory.
-    --outdir X, -O X: Output Directory.
-    --crs CRS, -C CRS: Input Data Coordinate Reference System - def.
-                       EPSG:3413
-    --res X, -R X: Input raster Resolution. - def. 50 meters.
-    --poly {-1,0,1,2}, -P {-1,0,1,2} Mean Bias Estimator - Polynomial Order
-            -> -1: no mean bias correction applied.
-            ->  0: mean bias correction evaluated as mean of the difference
-                   of the two rasters over the overlapping region.
-            ->  1: use polynomial surface of order one to estimate/correct
-                   the mean bias between the two raster.
-            ->  2: use polynomial surface of order two to estimate/correct
-                   the mean bias between the two raster.
+Mosaics Creation:
+    1. Read DEMs available for the selected day.
+    2. Use the raster covering the largest area as reference.
+    3. Align all the secondary DEMs to the reference DEM.
+        -> this last operation removes small biases present in consecutive DEMs.
+
+Use GDAL (Geospatial Data Abstraction Library) Python bindings provided by the
+Rasterio project.
+
+Find more details on the project website:
+    https://rasterio.readthedocs.io
+
+
+usage: mosaicing_dem_rasterio.py [-h] [--directory DIRECTORY] [
+    --outdir OUTDIR] [--crs CRS] [--res RES] [--resampling_alg RESAMPLING_ALG]
+    [--poly {-1,0,1,2}]
+
+Create Mosaic of TanDEM-X DEMs using Rasterio.
+
+options:
+  -h, --help            show this help message and exit
+  --directory DIRECTORY, -D DIRECTORY
+                        Project data directory.
+  --outdir OUTDIR, -O OUTDIR
+                        Output directory.
+  --crs CRS, -C CRS     Input Data Coordinate Reference System - def. EPSG:3413
+  --res RES, -R RES     Output raster Resolution. - def. 50 meters.
+  --resampling_alg RESAMPLING_ALG
+                        Warp Resampling Algorithm. - def. bilinear
+  --poly {-1,0,1,2}, -P {-1,0,1,2}
+                        Mean Bias Estimator - Polynomial Order
+
 
 Note: This preliminary version of the script has been developed to process
       TanDEM-X data available between 2011 and 2020 for the area surrounding
@@ -153,21 +168,21 @@ def main() -> None:
     poly_order = args.poly
 
     # - Input directory
-    input_data_path = os.path.join(args.directory, 'Petermann_Glacier_out',
+    input_data_path = os.path.join(args.directory, 'Processed_DEMs',
                                    f'TanDEM-X_EPSG-{args.crs}_res-{args.res}'
                                    f'_ralg-{args.resampling_alg}_rio')
     # - Create Output directory
     output_data_path \
-        = create_dir(os.path.join(args.directory, 'Petermann_Glacier_out'),
+        = create_dir(os.path.join(args.directory, 'Processed_DEMs'),
                      'Mosaics')
     # -
     output_data_path = create_dir(output_data_path,
-                                  f'Petermann_Glacier_Mosaics_EPSG-{args.crs}'
+                                  f'ROI_Mosaics_EPSG-{args.crs}'
                                   f'_res-{args.res}_ralg-{args.resampling_alg}'
                                   f'_rio_poly{args.poly}')
     # - DEM Index File
     indx_file = os.path.join(args.directory, 'Petermann_Glacier_out',
-                             'petermann_tandemx_dem_index.shp')
+                             'roi_tandemx_dem_index.shp')
 
     # - Read DEM index
     print('# - Load TanDEM-X DEMs Index.')
@@ -424,7 +439,7 @@ def main() -> None:
                        ('Units', 'str'), ('npts', 'str')]
     }
     out_f_name = os.path.join(output_data_path,
-                              'petermann_tandemx_dem_mosaics_index.shp')
+                              'roi_tandemx_dem_mosaics_index.shp')
     with fiona.open(out_f_name, mode='w', driver='ESRI Shapefile',
                     schema=schema, crs=crs) as poly_shp:
         for dem in tqdm(sorted(input_data_dir), ncols=70,

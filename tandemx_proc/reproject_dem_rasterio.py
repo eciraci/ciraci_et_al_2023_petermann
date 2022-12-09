@@ -9,22 +9,34 @@ Use GDAL (Geospatial Data Abstraction Library) Python bindings provided by the
 Rasterio project to apply the reprojection/interpolation.
 Rasterio provides more Pythonic ways to access GDAL API if compared to the
 standard GDAL Python Binding.
-(https://rasterio.readthedocs.io)
 
-COMMAND LINE OPTIONS:
-    --directory X, -D X: Project data directory.
-    --outdir X, -O X: Output Directory.
-    --crs X, -C X: Destination Coordinate Reference System - def.EPSG:3413
-    --res X, -R X: Output raster Resolution. - def. 50 meters.
-    --resampling_alg X: Warp Resampling Algorithm. - def. bilinear
+Find more details on the project website:
+    https://rasterio.readthedocs.io
+
+usage: reproject_dem_rasterio.py [-h] [--directory DIRECTORY]
+  [--outdir OUTDIR] [--crs CRS] [--res RES] [--resampling_alg RESAMPLING_ALG]
+
+Reproject TanDEM-X from Geographic Coordinates to the selected
+coordinate reference system.
+
+options:
+  -h, --help            show this help message and exit
+  --directory DIRECTORY, -D DIRECTORY
+                        Project data directory.
+  --outdir OUTDIR, -O OUTDIR
+                        Output directory.
+  --crs CRS, -C CRS     Destination Coordinate Reference System - def. EPSG:3413
+  --res RES, -R RES     Output raster Resolution. - def. 50 meters.
+  --resampling_alg RESAMPLING_ALG
+                        Warp Resampling Algorithm. - def. bi-linear
 
 The complete list of the available warp resampling algorithms can be found here:
 https://rasterio.readthedocs.io/en/
       latest/api/rasterio.enums.html#rasterio.enums.Resampling
 
-Note: This script has been developed to process TanDEM-X data available between
-    2011 and 2020 for the area surrounding Petermann Glacier
-    (Northwest Greenland).
+Note: This script was developed to process TanDEM-X elevation data  available
+    between  2011 and 2021 for the area surrounding  Petermann Glacier
+    (Northwest Greenland)
 
 PYTHON DEPENDENCIES:
     argparse: Parser for command-line options, arguments and sub-commands
@@ -131,13 +143,13 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # - Input directory
-    input_data_path = os.path.join(args.directory, 'Petermann_Glacier')
+    # - Input directory - directory containing the TanDEM-X DEMs
+    input_data_path = os.path.join(args.directory, 'RAW_DEMs')
     # - DEM Index File
-    indx_file = os.path.join(args.directory, 'Petermann_Glacier_out',
-                             'petermann_tandemx_dem_index.shp')
+    indx_file = os.path.join(args.directory, 'Processed_DEMs',
+                             'roi_tandemx_dem_index.shp')
     # - Create Output Directory
-    out_dir = create_dir(os.path.join(args.directory, 'Petermann_Glacier_out'),
+    out_dir = create_dir(os.path.join(args.directory, 'Processed_DEMs'),
                          f'TanDEM-X_EPSG-{args.crs}_res-{args.res}_ralg'
                          f'-{args.resampling_alg}_rio')
 

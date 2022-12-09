@@ -5,10 +5,12 @@ Written by Enrico Ciraci' (12/2021)
 
 Create a Daily Mosaics of TanDEM-X dems after the application of height
 corrections and the conversion from elevation above the standard ellipsoid
-WGS84 to elevation above the Geoid (EGM2008) - Mean Sea Level.
+WGS84 to elevation above the Geoid (EGM2008 or EIGEN-6C4) - Mean Sea Level.
 Before  creating the mosaic, the raster covering the largest area is chosen as
 reference. The other (secondary) rasters are afterward aligned to the reference
 one by employing on the estimation strategies reported below.
+
+See mosaicing_dem_rasterio.py - for more details.
 
 COMMAND LINE OPTIONS:
     --directory X, -D X: Project data directory.
@@ -24,10 +26,6 @@ COMMAND LINE OPTIONS:
                    the mean bias between the two raster.
             ->  2: use polynomial surface of order two to estimate/correct
                    the mean bias between the two raster.
-
-Note: This preliminary version of the script has been developed to process
-      TanDEM-X data available between 2011 and 2020 for the area surrounding
-      Petermann Glacier (Northwest Greenland).
 
 PYTHON DEPENDENCIES:
     numpy: package for scientific computing with Python
@@ -49,16 +47,15 @@ UPDATE HISTORY:
 # - Python Dependencies
 from __future__ import print_function
 import os
-import sys
 import argparse
+import datetime
+import warnings
 import numpy as np
 import pandas as pd
-import warnings
 from tqdm import tqdm
 import rasterio
 from rasterio.transform import Affine
 import geopandas as gpd
-from datetime import datetime
 
 # - Project Utility Functions
 from utility_functions import create_dir
@@ -69,7 +66,7 @@ def polynomial_mean_bias_estimator(x_v_reg, y_v_reg, elev_d_v_reg,
                                    poly_order=1):
     """
     Apply Linear Regression to calculate mean bias among
-    partially overlapping DEMs.
+    partially overlapping DEMs
     :param x_v_reg: flattened easting domain coordinates
     :param y_v_reg: flattened northing domain coordinates
     :param elev_d_v_reg: flattened elevation values
@@ -100,7 +97,8 @@ def polynomial_mean_bias_estimator(x_v_reg, y_v_reg, elev_d_v_reg,
     return reg
 
 
-def main():
+def main() -> None:
+    """Main Function"""
     # - Read the system arguments listed after the program
     parser = argparse.ArgumentParser(
         description="""Create Mosaic of Corrected TanDEM-X DEMs using Rasterio.
@@ -137,27 +135,29 @@ def main():
 
     # - Temporary Parameters
     poly_order = args.poly
-    # - TanDEM-X DEMs reprojection algorithm
+    # - TanDEM-X DEMs reprojection algorithm - use average by default
     resampling_alg = 'average'
+    # - GDAL Python Binding used to generate TanDEM-X Mosaics
+    gdal_binding = 'rio'
 
     # - Input directory
-    input_data_path = os.path.join(args.directory, 'Petermann_Glacier_out',
-                                   'TanDEM-X_EPSG-{}_res-{}_ralg-{}'
-                                   '_rio_amsl_corrected'
-                                   .format(args.crs, args.res, resampling_alg))
+    input_data_path = os.path.join(args.directory, 'Processed_DEMs',
+                                   f'TanDEM-X_EPSG-{args.crs}_res-{args.res}'
+                                   f'_ralg-{resampling_alg}_{gdal_binding}'
+                                   f'_amsl_corrected')
     # - Create Output directory
     output_data_path \
-        = create_dir(os.path.join('/', 'Volumes', 'Extreme Pro', 'TanDEM-X',
-                                  'Petermann_Glacier_out'), 'Mosaics')
+        = create_dir(os.path.join(os.getenv('PYTHONDATA'), 'TanDEM-X',
+                                  'Processed_DEMs'), 'Mosaics')
     # -
     output_data_path = create_dir(output_data_path,
-                                  'Petermann_Glacier_Mosaics_EPSG-{}'
-                                  '_res-{}_ralg-{}_rio_amsl_corrected_poly{}'
-                                  .format(args.crs, args.res,
-                                          resampling_alg, args.poly))
+                                  f'ROI_Glacier_Mosaics_EPSG-{args.crs}'
+                                  f'_res-{args.res}_ralg-{resampling_alg}_'
+                                  f'{gdal_binding}_amsl_'
+                                  f'corrected_poly{args.poly}')
     # - DEM Index File
-    indx_file = os.path.join(args.directory, 'Petermann_Glacier_out',
-                             'petermann_tandemx_dem_index.shp')
+    indx_file = os.path.join(args.directory, 'Processed_DEMs',
+                             'roi_tandemx_dem_index.shp')
 
     # - Read DEM index
     print('# - Load TanDEM-X DEMs Index.')
@@ -183,16 +183,16 @@ def main():
     # -
     for s_date in tqdm(date_range, ncols=70,
                        desc="# - Create Daily TanDEM-X Mosaics: "):
-        day_df = dem_df.query('year == {} & month == {} & day == {}'
-                              .format(s_date.year, s_date.month,
-                                      s_date.day))
+        day_df = dem_df.query(f'year == {s_date.year} & month == {s_date.month} '
+                              f'& day == {s_date.day}')
         # - if DEMs are found for the considered date,
         # - calculate their mosaic.
         if not day_df.empty:
             # - do not consider the [HH[:MM[:SS[.mmm[uuu]]]]]
             # - portion of the isoformat value of the considered date
-            date_isoformat = datetime(s_date.year, s_date.month,
-                                      s_date.day).isoformat().split('T')[0]
+            date_isoformat \
+                = datetime.datetime(s_date.year, s_date.month,
+                                    s_date.day).isoformat().split('T')[0]
             # - output mosaic file name
             output_file_name = date_isoformat + '_tdemx_mosaic.tiff'
 
@@ -201,14 +201,14 @@ def main():
 
             minx, miny, maxx, maxy = 0, 0, 0, 0
             crs_mosaic = None
-            mosaic_dict = dict()
+            mosaic_dict = {}
             for cnt, dem_name in enumerate(input_file_list):
                 # - Import DEM data
                 # - List input data directory content
                 f_name = [os.path.join(input_data_path, x)
                           for x in os.listdir(input_data_path)
                           if dem_name in x][0]
-                mosaic_dict[dem_name] = dict()
+                mosaic_dict[dem_name] = {}
 
                 # - Read DEM elevation data from GeoTiff
                 src = load_dem_tiff(f_name)
@@ -252,8 +252,7 @@ def main():
             # - Note that these axes define a raster coordinate system
             # - where the origin is the lower left corner of the lower left
             # - pixel. The output  raster will have to be referenced
-            # - is a coordinates' system where the origin is the upper left
-            # - pixel of the raster.
+            # - system where the origin is the upper left  pixel of the raster.
             mosaic_vect_x = np.arange(minx, maxx+1, args.res)
             mosaic_vect_y = np.arange(miny, maxy+1, args.res)
 
@@ -262,7 +261,7 @@ def main():
             # -    #pixels [i.e. approximately the largest covered area]
             reference_raster = None
             n_pts_max = 0
-            for dem_name in mosaic_dict.keys():
+            for dem_name in mosaic_dict:
                 if mosaic_dict[dem_name]['npts'] > n_pts_max:
                     n_pts_max = mosaic_dict[dem_name]['npts']
                     reference_raster = dem_name
@@ -330,8 +329,7 @@ def main():
                         reg = \
                             polynomial_mean_bias_estimator(x_v_reg, y_v_reg,
                                                            elev_d_v_reg,
-                                                           poly_order=
-                                                           poly_order)
+                                                           poly_order=poly_order)
                         if poly_order == 1:
                             # - mean_bias(x, y) - polynomial order 1
                             mean_bias = ((m_xx*reg[0]) + (m_yy*reg[1])
@@ -373,15 +371,15 @@ def main():
                                     output_file_name)
             # - Calculate Affine Transformation of the output raster
             res = args.res
-            x = mosaic_vect_x
-            y = mosaic_vect_y
+            x_vect = mosaic_vect_x
+            y_vect = mosaic_vect_y
             # - Rotate Mosaic Y-Axis
             mosaic = np.flipud(mosaic)
-            y = np.flipud(y)
+            y_vect = np.flipud(y_vect)
             # - shift the y-axis by 1-pixel in order to use the
             # - upper left corner of the pixel as reference.
-            y += res
-            transform = (Affine.translation(x[0], y[0])
+            y_vect  += res
+            transform = (Affine.translation(x_vect[0], y_vect[0])
                          * Affine.scale(res, -res))
             with rasterio.open(out_path, 'w', driver='GTiff',
                                height=mosaic.shape[0],
@@ -394,7 +392,7 @@ def main():
 
 # - run main program
 if __name__ == '__main__':
-    start_time = datetime.now()
+    start_time = datetime.datetime.now()
     main()
-    end_time = datetime.now()
-    print("# - Computation Time: {}".format(end_time - start_time))
+    end_time = datetime.datetime.now()
+    print(f"# - Computation Time: {end_time - start_time}")

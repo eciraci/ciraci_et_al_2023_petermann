@@ -6,22 +6,38 @@ Written by Enrico Ciraci' (08/2021)
 Reproject TanDEM-X DEMs from their native projection [EPSG:4326] to the selected
 new coordinate reference system.
 Use GDAL (Geospatial Data Abstraction Library) Python bindings package to apply
-the reprojection/interpolation. (https://gdal.org/api/python.html)
+the reprojection/interpolation.
 
-COMMAND LINE OPTIONS:
-    --directory X, -D X: Project data directory.
-    --outdir X, -O X: Output Directory.
-    --crs X, -C X: Destination Coordinate Reference System - def.EPSG:3413
-    --res X, -R X: Output raster Resolution. - def. 50 meters.
-    --resampling_alg X: Warp Resampling Algorithm. - def. bilinear
+Find more details on the project website:
+    https://gdal.org/api/python.html
+
+usage: mosaicing_dem_gdal.py [-h] [--directory DIRECTORY] [--outdir OUTDIR]
+        [--crs CRS] [--res RES] [--resampling_alg RESAMPLING_ALG]
+        [--poly {-1,0,1,2}]
+
+Create Mosaic of TanDEM-X DEMs using GDAL.
+
+options:
+  -h, --help            show this help message and exit
+  --directory DIRECTORY, -D DIRECTORY
+                        Project data directory.
+  --outdir OUTDIR, -O OUTDIR
+                        Output directory.
+  --crs CRS, -C CRS     Input Data Coordinate Reference System - def. EPSG:3413
+  --res RES, -R RES     Output raster Resolution. - def. 50 meters.
+  --resampling_alg RESAMPLING_ALG
+                        Warp Resampling Algorithm. - def. bilinear
+  --poly {-1,0,1,2}, -P {-1,0,1,2}
+                        Mean Bias Estimator - Polynomial Order
+
 
 The complete list of warp resampling algorithms can be found here:
 https://gdal.org/programs/gdalwarp.html
 https://gdal.org/programs/gdalwarp.html#cmdoption-gdalwarp-r
 
-Note: This preliminary version of the script has been developed to process
-      TanDEM-X data available between 2011 and 2020 for the area surrounding
-      Petermann Glacier (Northwest Greenland).
+Note: This script was developed to process TanDEM-X elevation data  available
+    between  2011 and 2021 for the area surrounding Petermann Glacier
+    (Northwest Greenland)
 
 PYTHON DEPENDENCIES:
     argparse: Parser for command-line options, arguments and sub-commands
@@ -89,14 +105,14 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # - Input directory
-    input_data_path = os.path.join(args.directory, 'Petermann_Glacier')
+    # - Input directory - directory containing the TanDEM-X DEMs
+    input_data_path = os.path.join(args.directory, 'RAW_DEMs')
     # - DEM Index File
-    indx_file = os.path.join(args.directory, 'Petermann_Glacier_out',
-                             'petermann_tandemx_dem_index.shp')
+    indx_file = os.path.join(args.directory, 'Processed_DEMs',
+                             'roi_tandemx_dem_index.shp')
 
     # - Create Output Directory
-    out_dir = create_dir(os.path.join(args.directory, 'Petermann_Glacier_out'),
+    out_dir = create_dir(os.path.join(args.directory, 'Processed_DEMs'),
                          f'TanDEM-X_EPSG-{args.crs}_res-{args.res}_ralg'
                          f'-{args.resampling_alg}_gdal')
     # - Read DEM index

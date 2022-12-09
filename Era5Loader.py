@@ -1,6 +1,17 @@
 """
 Enrico Ciraci 12/2021
 Era5Loader - Utility class to import ERA5 Mean Sea Level Pressure data.
+
+PYTHON DEPENDENCIES:
+    numpy: package for scientific computing with Python
+           https://numpy.org
+    scipy: library for mathematics, science, and engineering
+          https://scipy.org
+    pandas: Python Data Analysis Library
+           https://pandas.pydata.org/
+    xarray: N-D labeled arrays and datasets in Python
+          https://xarray.pydata.org/en/stable/
+
 """
 # - python dependencies
 from __future__ import print_function

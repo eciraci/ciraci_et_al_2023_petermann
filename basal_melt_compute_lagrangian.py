@@ -3,8 +3,8 @@ u"""
 basal_melt_compute_lagrangian_ts.py
 Written by Enrico Ciraci' (02/2022)
 
-Compute list Ice Shelf basal melt rate from a stack of digital elevation models
-from the TanDEM-X mission in a Lagrangian framework.
+Compute Ice Shelf basal melt rate from a stack of digital elevation models from
+the TanDEM-X mission in a Lagrangian framework.
 
 NOTE: Basal melt-rate is calculated following the methodology described by
       Shean, D.E., Joughin, I.R., Dutrieux, P., Smith, B.E. and Berthier,
@@ -43,8 +43,6 @@ optional arguments:
   --v_smooth, -V        Smooth Input velocity Maps.
   --bm_loc {init_pixel,along_flow,midpoint}, -B {init_pixel,along_flow,midpoint}
                         Basal melt redistribution strategy.
-  --sample_bm           Sample basal melt rate estimate.
-  --sample_only         Sample previously calculated basal melt rate estimate.
   --grid_method {bilinear,nearest}, -G {bilinear,nearest}
                         Griddata interpolation Method.
   --np NP, -N NP        Number of Parallel Processes.
@@ -53,10 +51,9 @@ PYTHON DEPENDENCIES:
     numpy: package for scientific computing with Python
            https://numpy.org
     scipy: Fundamental algorithms for scientific computing in Python
-          https://scipy.org
-    matplotlib: Library for creating static, animated, and interactive
-           visualizations in Python.
-           https://matplotlib.org
+           https://scipy.org
+    pyproj: Python interface to PROJ library
+           https://pyproj4.github.io/pyproj/stable/
     pandas: Python Data Analysis Library
            https://pandas.pydata.org
     geopandas: Python tools for geographic data
@@ -68,6 +65,8 @@ PYTHON DEPENDENCIES:
     shapely: Manipulation and analysis of geometric objects in the Cartesian
            plane.
            https://shapely.readthedocs.io/en/stable
+    multiprocessing: Process-based parallelism
+           https://docs.python.org/3/library/multiprocessing.html
 
 UPDATE HISTORY:
 
@@ -76,20 +75,21 @@ UPDATE HISTORY:
 from __future__ import print_function
 import os
 import argparse
+import datetime
 from multiprocessing import Pool
 from functools import partial
+from tqdm import tqdm
 import numpy as np
 from scipy.interpolate import griddata
 from scipy import signal
 import pandas as pd
-import datetime
 from pyproj import CRS
 from pyproj import Transformer
 # - Program Dependencies
 from utility_functions_rio import load_dem_tiff, virtual_warp_rio, save_raster,\
     clip_raster
 from utility_functions import calculate_n_month, create_dir, divergence,\
-    do_kdtree, sample_raster_petermann_no_fig
+    do_kdtree
 from utility_functions_tdx import dem_2_skip
 from velocity_map_time_interpolation import load_velocity_map,\
     load_velocity_map_nearest
@@ -110,7 +110,7 @@ def load_smb_data(dem_1_date: datetime.datetime, dem_2_date: datetime.datetime,
     """
     if verbose:
         print('# - Loading SMB data from RACMO2.3p2.')
-    smb_domain_name = 'Petermann_Domain_Velocity_Stereo'
+    smb_domain_name = 'ROI_Glacier_'
     lat_pt = 80.5
     lon_pt = -60.
     rho_ice = 0.9167  # - density of ice g/cm3
@@ -157,7 +157,7 @@ def load_smb_data(dem_1_date: datetime.datetime, dem_2_date: datetime.datetime,
 def load_ice_mask(data_dir: str, res: int = 150, crs: int = 3413,
                   resampling_alg: str = 'average') -> dict:
     """
-    Load ICE Mask From BedMachine v.4.0
+    Load ICE Mask From BedMachine v.5.0
     :param data_dir: absolute path to project data directory
     :param res: mask resolution
     :param crs: map coordinate reference system
@@ -167,13 +167,13 @@ def load_ice_mask(data_dir: str, res: int = 150, crs: int = 3413,
     # - Load ICE Mask From BedMachine v.4.0
     bed_machine_path = os.path.join(data_dir, 'GIS_Data',
                                     'BedMachineGreenland',
-                                    'BedMachineGreenlandIceMaskv4_'
-                                    'Petermann_Stereo.tiff')
+                                    'BedMachineGreenlandIceMaskv5_'
+                                    'ROI_Glacier_Stereo.tiff')
     bed_machine_path_interp \
         = bed_machine_path.replace('.tiff', f'_res{res}m.tiff')
     if not os.path.isfile(bed_machine_path_interp):
         virtual_warp_rio(bed_machine_path, bed_machine_path_interp,
-                         res=res, crs=crs, method=resampling_alg,
+                         res_x=res, res_y=res, crs=crs, method=resampling_alg,
                          dtype='uint8')
     ice_mask_input = load_dem_tiff(bed_machine_path_interp)
     ice_mask = ice_mask_input['data']
@@ -190,7 +190,26 @@ def load_ice_mask(data_dir: str, res: int = 150, crs: int = 3413,
 def compute_melt_rate(data_dir: str, dem_1_p: str, dem_2_p: str, out_dir: str,
                       smooth: bool = False, w_size: int = 0, res: int = 150,
                       grid_method: str = 'nearest', bm_loc: str = 'midpoint',
-                      area_thresh: int = 2e9, sample_bm=False) -> None:
+                      area_thresh: int = 2e9) -> None:
+    """
+    Estimate Average Melt Rate in a Lagrangian Framework  by comparing elevation
+    data from a pair of TanDEM-x DEMs.
+    :param data_dir: absolute path to data directory
+    :param dem_1_p: TanDEM-X DEM 1 path
+    :param dem_2_p: TanDEM-X DEM 2 path
+    :param out_dir:aboslute path to output directory
+    :param smooth: smooth output melt rate map
+    :param w_size: smoothing kernel  half window size
+    :param res: input data resolution
+    :param grid_method: interpolation method
+    :param bm_loc: melt rate redistribution method:
+                1. along_flow - redistribute melt rate along parcel path
+                2. midpoint - redistribute melt rate at the midpoint of the path
+                3. start_point - redistribute melt rate at the start point of
+                        ice parcel [default]
+    :param area_thresh: minimum DEM common area threshold
+    :return: None
+    """
     # - Parameters and Constants
     ref_crs = 3413  # - coordinate reference system
     rho_ice = 0.9167  # - density of ice g/cm3
@@ -200,7 +219,7 @@ def compute_melt_rate(data_dir: str, dem_1_p: str, dem_2_p: str, out_dir: str,
     resampling_alg = 'average'
 
     # - Velocity Domain
-    v_domain = 'Petermann_Domain_Velocity_Stereo_tdx'
+    v_domain = 'ROI_Domain_Name'  # - Region of Interest Name
     v_smooth = False        # - smooth velocity maps
     v_domain_buffer = 5e3   # - velocity crop buffer in meters
     v_smooth_mode = 'ave'   # - velocity smoothing filter (average/median)
@@ -208,10 +227,8 @@ def compute_melt_rate(data_dir: str, dem_1_p: str, dem_2_p: str, out_dir: str,
     # - Velocity Interpolation Method interpolation - Time domain
     v_t_interp = 'bilinear'
 
-    # - Clip Output Raster
-    clip_shp_mask_path = os.path.join(data_dir, 'GIS_Data',
-                                      'Petermann_features_extraction',
-                                      'Petermann_iceshelf_clipped_epsg3413.shp')
+    # - Ice Shelf used to Clip Output Raster
+    clip_shp_mask_path = os.path.join(data_dir, 'GIS_Data', 'ice_shelf_mask.shp')
 
     # - Calculate Basal Melt Smoothing filter Kernel size
     if smooth:
@@ -256,7 +273,7 @@ def compute_melt_rate(data_dir: str, dem_1_p: str, dem_2_p: str, out_dir: str,
     # - SMB Domain Mesh-grid
     smb_m_xx, smb_m_yy = np.meshgrid(smb_x_coords, smb_y_coords)
 
-    # - Load Ice Mask from Bedmachine 4.0
+    # - Load Ice Mask from Bedmachine version 5.0
     ice_mask_input = load_ice_mask(data_dir, res=res, crs=ref_crs,
                                    resampling_alg=resampling_alg)
     ice_mask = ice_mask_input['ice_mask']
@@ -373,36 +390,22 @@ def compute_melt_rate(data_dir: str, dem_1_p: str, dem_2_p: str, out_dir: str,
         month = r_date.month
         day = r_date.day
 
-        if year > 2013:
-            # - Load Interpolate velocity Map
-            # - If selected, apply smoothing filter to the interpolated maps.
-            if v_t_interp == 'bilinear':
-                v_map = load_velocity_map(year, month, day, data_dir,
-                                          domain=v_domain,
-                                          smooth=v_smooth,
-                                          smooth_mode=v_smooth_mode,
-                                          smooth_w_size=v_smooth_size,
-                                          verbose=False)
-            else:
-                v_map = load_velocity_map_nearest(year, month, day,
-                                                  data_dir,
-                                                  domain=v_domain,
-                                                  smooth=v_smooth,
-                                                  smooth_mode=v_smooth_mode,
-                                                  smooth_w_size=v_smooth_size,
-                                                  verbose=False)
+        # - Load Interpolate velocity Map
+        if v_t_interp == 'bilinear':
+            v_map = load_velocity_map(year, month, day, data_dir,
+                                      domain=v_domain,
+                                      smooth=v_smooth,
+                                      smooth_mode=v_smooth_mode,
+                                      smooth_w_size=v_smooth_size,
+                                      verbose=False)
         else:
-            # - Velocity maps for years before 2014 are characterized
-            # - by high noise level and discontinuities. Do not use these maps.
-            # - Use velocity from 2014 based on the assumption that ice velocity
-            # - does not change significantly over time.
-            v_map = load_velocity_map_nearest(2014, 6, 1,
-                                              data_dir,
+            v_map = load_velocity_map_nearest(year, month, day, data_dir,
                                               domain=v_domain,
                                               smooth=v_smooth,
                                               smooth_mode=v_smooth_mode,
                                               smooth_w_size=v_smooth_size,
                                               verbose=False)
+
         # -
         grid_vx = v_map['vx_out']
         grid_vy = v_map['vy_out']
@@ -559,22 +562,22 @@ def compute_melt_rate(data_dir: str, dem_1_p: str, dem_2_p: str, out_dir: str,
         mlt_sample_tra_grid_med \
             = np.zeros([n_months, len(d_diff_vect_y), len(d_diff_vect_x)])
 
-        for t in range(n_months):
+        for tm in range(n_months):
             # - Interpolate Melt Rate
             s_points_temp = np.zeros(s_points.shape)
-            s_points_temp[:, 0] = s_points_hist[t, :, 0]
-            s_points_temp[:, 1] = s_points_hist[t, :, 1]
+            s_points_temp[:, 0] = s_points_hist[tm, :, 0]
+            s_points_temp[:, 1] = s_points_hist[tm, :, 1]
             mlt_sample_tra_grid = griddata(s_points_temp, mlt_sample,
                                            (m_xx, m_yy),
                                            method=grid_method)
             mlt_sample_tra_grid[ind_nan] = np.nan
-            mlt_sample_tra_grid_med[t, :, :] = np.flipud(mlt_sample_tra_grid)
+            mlt_sample_tra_grid_med[tm, :, :] = np.flipud(mlt_sample_tra_grid)
 
         # - Final Melt Rate Estimate
         melt_rate = np.median(mlt_sample_tra_grid_med, axis=0)
 
     elif bm_loc == 'midpoint':
-        # - Midpoint Redistribution Method
+        # - Midpoint Redistribution Method - Method used in Ciraci et al. 2022
         # - Sample Melt rate at the final location of each ice particle
         combined_x_y_arrays = np.dstack([m_xx.ravel(), m_yy.ravel()])[0]
         # - use kd-tree to find the closest location to each ice particle
@@ -612,17 +615,9 @@ def compute_melt_rate(data_dir: str, dem_1_p: str, dem_2_p: str, out_dir: str,
     # - Delete Temporary Output
     os.remove(out_path_bme_temp)
 
-    # - sample the obtained melt rate estimate along the defined longitudinal
-    # - and transverse profile.
-    if sample_bm:
-        try:
-            sample_raster_petermann_no_fig(data_dir, out_path_bme,
-                                           ref_crs=ref_crs)
-        except TypeError:
-            return
 
-
-def main():
+def main() -> None:
+    """Main function."""
     parser = argparse.ArgumentParser(
         description="""Compute Ice Shelf basal melt rate from a stack
         of digital elevation models from the TanDEM-X mission in a
@@ -630,9 +625,8 @@ def main():
     )
 
     # - Absolute Path to directory containing input data.
-    default_dir = os.path.join('/', 'Volumes', 'Extreme Pro')
+    default_dir = os.getenv('PYTHONDATA')
     parser.add_argument('--directory', '-D',
-                        type=lambda p: os.path.abspath(os.path.expanduser(p)),
                         default=default_dir,
                         help='Project data directory.')
 
@@ -659,7 +653,7 @@ def main():
 
     # - Delta Time - Time separation in years between considered DEM pairs.
     parser.add_argument('--delta_time', '-T', type=int,
-                        default=2,
+                        default=1,
                         help='Distance in years between DEMs to compare.')
 
     # - Apply Spatial Smoothing to Melt Rate Map
@@ -680,19 +674,10 @@ def main():
     parser.add_argument('--v_smooth', '-V', action='store_true',
                         help='Smooth Input velocity Maps.')
 
-    # - Melt Rate redistribution method - USE midpoint.
+    # - Melt Rate redistribution method
     parser.add_argument('--bm_loc', '-B', default='midpoint',
                         choices=['init_pixel', 'along_flow', 'midpoint'],
                         help='Basal melt redistribution strategy.')
-
-    # - Sample Melt Rate
-    parser.add_argument('--sample_bm', action='store_true',
-                        help='Sample basal melt rate estimate.')
-
-    # - Sample Only Existing Estimates
-    parser.add_argument('--sample_only', action='store_true',
-                        help='Sample previously calculated basal'
-                             ' melt rate estimate.')
 
     # - Griddata interpolation Method - Used when shifting DEMs
     parser.add_argument('--grid_method', '-G', default='nearest',
@@ -730,136 +715,123 @@ def main():
             = create_dir(out_dir, f'bm_average_{args.w_size}'
                                   f'_delta_time={args.delta_time}')
 
-    if args.sample_only:
-        # - Sample previously calculated basal melt estimates
-        bm_list = [os.path.join(out_dir, x) for x in os.listdir(out_dir)
-                   if x.endswith('.tiff') and not x.startswith('.')]
-        if bm_list:
-            for bm_raster in bm_list:
-                sample_raster_petermann_no_fig(args.directory, bm_raster,
-                                               ref_crs=ref_crs)
-        else:
-            print('# - No melt rate estimates found.')
+    # - Absolute Path to directory containing TanDEM-X digital models.
+    # - NOTE: Elevation data must have been converted from elevation with
+    # -      respect to the standard Ellipsoid WGS84 to elevation with
+    # -      respect to the mean sea level(give a selected reference geoid).
+    # -      The corrected elevation values must also include
+    # -      the effects of:
+    # -       - Inverse Barometer Effect;
+    # -       - Ocean Mean Dynamic Topography;
+    # -       - Ice Shelf Shift due to Tidal cycles;
 
-    else:
-        # - Absolute Path to directory containing TanDEM-X digital models.
-        # - NOTE: Elevation data must have been converted from elevation with
-        # -      respect to the standard Ellipsoid WGS84 to elevation with
-        # -      respect to the mean sea level(give a selected reference geoid).
-        # -      The corrected elevation values must also include
-        # -      the effects of:
-        # -       - Inverse Barometer Effect;
-        # -       - Ocean Mean Dynamic Topography;
-        # -       - Ice Shelf Shift due to Tidal cycles;
+    t_dem_dir = os.path.join(args.directory, 'TanDEM-X',
+                             'Processed_DEMs', 'Mosaics',
+                             f'ROI_Glacier_Mosaics_EPSG-{ref_crs}_'
+                             f'res-{args.res}_ralg-{resampling_alg}'
+                             f'_{gdal_binding}_amsl_corrected_poly0')
 
-        t_dem_dir = os.path.join(args.directory, 'TanDEM-X',
-                                 'Petermann_Glacier_out', 'Mosaics',
-                                 f'Petermann_Glacier_Mosaics_EPSG-{ref_crs}_'
-                                 f'res-{args.res}_ralg-{resampling_alg}'
-                                 f'_{gdal_binding}_amsl_corrected_poly0')
+    # - Load list of DEMs that should be excluded from the evaluation
+    dem_2_skip_list = dem_2_skip()
 
-        # - Load list of DEMs that should be excluded from the evaluation
-        dem_2_skip_list = dem_2_skip()
+    # - list input directory content
+    input_dir_list = sorted([os.path.join(t_dem_dir, x)
+                             for x in os.listdir(t_dem_dir)
+                             if not x.startswith('.')
+                             and x.endswith('tiff')])
+    # - Extract time-tag from each daily mosaic file name
+    dem_name_list = []
+    dem_path_list = []
+    date_list = []
+    day_list = []
+    month_list = []
+    year_list = []
 
-        # - list input directory content
-        input_dir_list = sorted([os.path.join(t_dem_dir, x)
-                                 for x in os.listdir(t_dem_dir)
-                                 if not x.startswith('.')
-                                 and x.endswith('tiff')])
-        # - Extract time-tag from each daily mosaic file name
-        dem_name_list = []
-        dem_path_list = []
-        date_list = []
-        day_list = []
-        month_list = []
-        year_list = []
+    for dem_t in input_dir_list:
+        f_name = dem_t.split('/')[-1].replace('_tdemx_mosaic.tiff', '')
+        if f_name in dem_2_skip_list:
+            continue
+        date_str = f_name.split('-')
+        dem_name_list.append(f_name)
+        dem_path_list.append(dem_t)
+        day_list.append(int(date_str[-2]))
+        month_list.append(int(date_str[1]))
+        year_list.append(int(date_str[0]))
+        date_list.append(datetime.datetime(int(date_str[0]),
+                                           int(date_str[1]),
+                                           int(date_str[2])))
+    # - Create a Pandas Dataframe to index the available DEMs
+    data_frame_cont = {'name': dem_name_list, 'path': dem_path_list,
+                       'year': year_list, 'month': month_list,
+                       'day': day_list, 'time': date_list}
+    dem_df = pd.DataFrame(data_frame_cont)
 
-        for dt in input_dir_list:
-            f_name = dt.split('/')[-1].replace('_tdemx_mosaic.tiff', '')
-            if f_name in dem_2_skip_list:
-                continue
-            date_str = f_name.split('-')
-            dem_name_list.append(f_name)
-            dem_path_list.append(dt)
-            day_list.append(int(date_str[-2]))
-            month_list.append(int(date_str[1]))
-            year_list.append(int(date_str[0]))
-            date_list.append(datetime.datetime(int(date_str[0]),
-                                               int(date_str[1]),
-                                               int(date_str[2])))
-        # - Create a Pandas Dataframe to index the available DEMs
-        data_frame_cont = {'name': dem_name_list, 'path': dem_path_list,
-                           'year': year_list, 'month': month_list,
-                           'day': day_list, 'time': date_list}
-        dem_df = pd.DataFrame(data_frame_cont)
+    # - Use only Mosaics available during the selected reference period
+    # - of time.
+    dem_df = dem_df.loc[(dem_df['time'] > t00) & (dem_df['time'] <= t11)]
+    print(f'# - Selected Reference Period: {args.f_year} - {args.l_year}')
+    print(f'# - Available DEMs: {dem_df.shape[0]}')
 
-        # - Use only Mosaics available during the selected reference period
-        # - of time.
-        dem_df = dem_df.loc[(dem_df['time'] > t00) & (dem_df['time'] <= t11)]
-        print(f'# - Selected Reference Period: {args.f_year} - {args.l_year}')
-        print(f'# - Available DEMs: {dem_df.shape[0]}')
+    # - Iterate through the pandas index to determine the candidate DEM
+    # - pairs that will be used in the melt rate calculation based on the
+    # - selected criteria.
+    # - By default DEMS acquired during the same month at delta_time years
+    # - distance are included in the comparison.
+    n_pairs = 0
+    ave_comb = []
+    # - create new Dataframe containing a row for each DEM pair
+    dem_1 = []
+    dem_2 = []
+    date_1 = []
+    date_2 = []
+    for _, row in dem_df.iterrows():
+        r_year = row['year']
+        r_month = row['month']
+        sample_pair = dem_df.query(f'year == {r_year+args.delta_time} '
+                                   f'& month == {r_month}')
+        n_pairs += sample_pair.shape[0]
+        ave_comb.append(sample_pair.shape[0])
 
-        # - Iterate through the pandas index to determine the candidate DEM
-        # - pairs that will be used in the melt rate calculation based on the
-        # - selected criteria.
-        # - By default DEMS acquired during the same month at two years
-        # - distance are included in the comparison.
-        n_pairs = 0
-        ave_comb = []
-        # - create new Dataframe containing a row for each DEM pair
-        dem_1 = []
-        dem_2 = []
-        date_1 = []
-        date_2 = []
-        for _, row in dem_df.iterrows():
-            r_year = row['year']
-            r_month = row['month']
-            sample_pair = dem_df.query(f'year == {r_year+args.delta_time} '
-                                       f'& month == {r_month}')
-            n_pairs += sample_pair.shape[0]
-            ave_comb.append(sample_pair.shape[0])
+        for _, s_row in sample_pair.iterrows():
+            dem_1.append(row['path'])
+            dem_2.append(s_row['path'])
+            date_1.append(row['time'])
+            date_2.append(s_row['time'])
 
-            for _, s_row in sample_pair.iterrows():
-                dem_1.append(row['path'])
-                dem_2.append(s_row['path'])
-                date_1.append(row['time'])
-                date_2.append(s_row['time'])
+    print(f'# - Number of DEMs combinations based on the '
+          f'considered selection criteria: {n_pairs}')
+    print(f'# - Average Number of Comparisons per DEM: '
+          f'{np.average(ave_comb)}')
 
-        print(f'# - Number of DEMs combinations based on the '
-              f'considered selection criteria: {n_pairs}')
-        print(f'# - Average Number of Comparisons per DEM: '
-              f'{np.average(ave_comb)}')
+    # - Initialize DEM comparison dataframe
+    dem_pair_dict = {'dem_1': dem_1, 'dem_2': dem_2,
+                     'date_1': date_1, 'date_2': date_2}
+    dem_pair_df = pd.DataFrame(dem_pair_dict)
+    # -
+    dem_1_list = []
+    dem_2_list = []
+    for _, d_row in dem_pair_df.iterrows():
+        dem_1_list.append(d_row['dem_1'])
+        dem_2_list.append(d_row['dem_2'])
 
-        # - Initialize DEM comparison dataframe
-        dem_pair_dict = {'dem_1': dem_1, 'dem_2': dem_2,
-                         'date_1': date_1, 'date_2': date_2}
-        dem_pair_df = pd.DataFrame(dem_pair_dict)
-        # -
-        dem_1_list = []
-        dem_2_list = []
-        for _, d_row in dem_pair_df.iterrows():
-            dem_1_list.append(d_row['dem_1'])
-            dem_2_list.append(d_row['dem_2'])
+    # - Project data directory
+    data_dir_list = [args.directory] * len(dem_1_list)
+    # - output directory
+    out_dir_list = [out_dir] * len(dem_1_list)
 
-        # - Project data directory
-        data_dir_list = [args.directory] * len(dem_1_list)
-        # - output directory
-        out_dir_list = [out_dir] * len(dem_1_list)
+    # - define input data batch
+    p_proc_input = zip(data_dir_list[:], dem_1_list[:],
+                       dem_2_list[:], out_dir_list[:])
 
-        # - define input data batch
-        p_proc_input = zip(data_dir_list[:], dem_1_list[:],
-                           dem_2_list[:], out_dir_list[:])
-
-        print('# - Computing Basal Melt Rate.')
-        from tqdm import tqdm
-        with Pool(args.np) as p:
-            kwargs = {'bm_loc': args.bm_loc, 'grid_method': args.grid_method,
-                      'res': args.res, 'smooth': args.smooth,
-                      'w_size': args.w_size,
-                      'sample_bm': args.sample_bm
-                      }
-            map_func = partial(compute_melt_rate, **kwargs)
-            r = list(tqdm(p.starmap(map_func, p_proc_input), total=30))
+    print('# - Computing Basal Melt Rate.')
+    with Pool(args.np) as prc_pool:
+        kwargs = {'bm_loc': args.bm_loc, 'grid_method': args.grid_method,
+                  'res': args.res, 'smooth': args.smooth,
+                  'w_size': args.w_size,
+                  'sample_bm': args.sample_bm
+                  }
+        map_func = partial(compute_melt_rate, **kwargs)
+        _ = list(tqdm(prc_pool.starmap(map_func, p_proc_input), total=30))
 
 
 if __name__ == '__main__':
