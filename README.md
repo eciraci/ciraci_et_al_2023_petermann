@@ -10,8 +10,9 @@ described in the paper: Ciraci, Rignot, et. al (2022) - Need To Update the Refer
 
 Ice shelf basal melt rate can be deduced from the Eulerian description of mass conservation for a column of ice (Rignot et al. 2013): 
 
-$$ \frac{\partial H}{\partial t} =  - \nabla \cdot (H \bar{v}) + \dot{a} + \dot{b} $$ (1)
-
+```math
+\frac{\partial H}{\partial t} =  - \nabla \cdot (H \bar{v}) + \dot{a} + \dot{b} (1)$$ 
+```
 Where $H$ is the ice thickness, $\bar{v}$ is the ice velocity vector, $\dot{a}$ the surface mass balance, $\dot{b}$ 
 the average melt rate,  and $\frac{\partial H}{\partial t}$ the ice thickness change rate, in meters per year,
 measured in a fixed reference frame. Melt rate estimates based on this equation are noisy due to the temporal 
@@ -23,8 +24,9 @@ in which the reference frame moves with the ice surface (Moholdt et al. 2014, Sh
 when ice can be assumed on  flotation, we compute the average melt rate b by solving the modified mass conservation 
 equation:
 
-$$ \dot{b} = - \left (\frac{\partial h}{\partial t} + (h -d)(\nabla \cdot \bar{v})\right )  \left ( \frac{\rho_{water}}{\rho _{water} - \rho _{ice}}\right ) - \dot{a}$$
-
+```math
+\dot{b} = - \left (\frac{\partial h}{\partial t} + (h -d)(\nabla \cdot \bar{v})\right )  \left ( \frac{\rho_{water}}{\rho _{water} - \rho _{ice}}\right ) - \dot{a} (2)
+```
 Where $h$ is the ice surface elevation with respect to mean sea level, $\frac{\partial h}{\partial t}$ is its temporal 
 derivative, $d$ the firn air content, $\rho _{water}$ density of seawater, $\rho _{ice}$ density of ice, 
 and $\nabla \cdot \bar{v}$ the ice flow divergence.
