@@ -1,4 +1,4 @@
-# ciraci_rignot_et_al_2022
+## Ice Shelf Basal Melt Rate Estimation in a Lagrangian Framework
 The repository contains a set of scripts that can be used to estimate ice shelf basal melt using time-tagged Digital Elevation Models from the DLR TanDEM-X mission.
 For more details see: Ciraci, Rignot, et. al (2022) - Need To Update the Reference
 
@@ -6,7 +6,7 @@ For more details see: Ciraci, Rignot, et. al (2022) - Need To Update the Referen
 
 
 ---
-### Melt Rate Estimation in a Lagrangian Framework
+### Background:
 
 Ice shelf basal melt rate can be deduced from the **Eulerian description of mass conservation** for a 
 column of ice (Rignot et al. [2013](https://www.science.org/doi/10.1126/science.1235798)): 
