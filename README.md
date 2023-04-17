@@ -1,5 +1,6 @@
 ## Ice Shelf Basal Melt Rate Estimation in a Lagrangian Framework
 [![Language][]][1] [![License][]][2]
+[![DOI](https://zenodo.org/badge/575571644.svg)](https://zenodo.org/badge/latestdoi/575571644)
 
 The repository contains a set of scripts that can be used to estimate ice shelf basal melt using time-tagged Digital Elevation Models from the DLR TanDEM-X mission.
 For more details see: Ciraci, Rignot, et. al (2022) - Need To Update the Reference.
