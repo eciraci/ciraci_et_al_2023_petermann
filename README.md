@@ -4,7 +4,7 @@
 
 The repository contains a set of scripts that can be used to estimate ice shelf basal melt using time-tagged Digital Elevation Models from the DLR TanDEM-X mission.
 
-This code repository supplements the manuscript Melt rates in the kilometer-size grounding zone of Petermann Glacier, Greenland before and during a retreat." by Ciracì, E., Rignot, E., Scheuchl, B., Tolpekin, V., Wollersheim, M., An, L., Milillo, P., Bueso-Bello, J. L., Rizzoli, P., Dini, L., 2023 - in press in The Proceedings of the National Academy of Sciences (PNAS).
+This code repository supplements the manuscript "Melt rates in the kilometer-size grounding zone of Petermann Glacier, Greenland before and during a retreat." by Ciracì, E., Rignot, E., Scheuchl, B., Tolpekin, V., Wollersheim, M., An, L., Milillo, P., Bueso-Bello, J. L., Rizzoli, P., Dini, L., 2023 - in press in The Proceedings of the National Academy of Sciences (PNAS).
 
 ---
 ### Background:
