@@ -94,6 +94,9 @@ PYTHON DEPENDENCIES:
            https://xarray.pydata.org/en/stable
 
 UPDATE HISTORY:
+12/09/2021 - Updated to GitHub before manuscript submission
+    and first public release.
+08/15/2023 - Updated to ensure compatibility with PyTMD v2.0.6
 """
 # - python dependencies
 from __future__ import print_function
@@ -108,11 +111,8 @@ import xarray as xr
 import rasterio
 from rasterio.transform import Affine
 from tqdm import tqdm
-
 # - pyTMD
-from pyTMD.read_tide_model import extract_tidal_constants
-from pyTMD.infer_minor_corrections import infer_minor_corrections
-from pyTMD.predict_tide import predict_tide
+import pyTMD
 from pyTMD.time import convert_calendar_dates
 # - Program Dependencies
 from Era5Loader import Era5Loader
@@ -315,11 +315,12 @@ def main():
     epsg_code = 'PSNorth'
     var_type = 'z'
     # -- read tidal constants and interpolate to grid points
-    amp, ph, d, c = extract_tidal_constants(args.lon, args.lat, grid_file,
-                                            model_file, epsg_code,
-                                            TYPE=var_type,
-                                            METHOD='spline',
-                                            GRID=model_format)
+    amp, ph, d, c \
+        = pyTMD.io.OTIS.extract_constants(args.lon, args.lat, grid_file,
+                                          model_file, epsg_code,
+                                          TYPE=var_type,
+                                          METHOD='spline',
+                                          GRID=model_format)
     # -- calculate complex phase in radians for Euler's
     cph = -1j * ph * np.pi / 180.0
     # -- calculate constituent oscillation
@@ -415,11 +416,13 @@ def main():
                                               minute=row['datetime'].minute,
                                               second=row['datetime'].second)
         # - predict tidal elevations at time and infer minor corrections
-        tide_p = predict_tide(delta_time_t, hc, c, DELTAT=0,
-                              CORRECTIONS=model_format)
-        minor_p = infer_minor_corrections(delta_time_t, hc, c,
-                                          DELTAT=0,
-                                          CORRECTIONS=model_format)
+        tide_p \
+            = pyTMD.predict.map(delta_time_t, hc, c,
+                                deltat=0, corrections=model_format)
+        minor_p \
+            = pyTMD.predict.infer_minor(delta_time_t, hc, c,
+                                        deltat=0,
+                                        corrections=model_format)
         # - Tide Correction in Meters
         tide_corr = tide_p + minor_p[0]
 
